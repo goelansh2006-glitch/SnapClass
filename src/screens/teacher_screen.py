@@ -2,7 +2,7 @@ import streamlit as st
 from src.ui.base_layout import style_background_dashboard, style_base_layout
 from src.components.header import header_dashboard
 from src.components.footer import footer_dashboard
-
+from src.database.db import check_teacher_exists, create_teacher, teacher_login
 
 def teacher_screen():
 
@@ -70,8 +70,7 @@ def teacher_screen_login():
             st.session_state['login_type'] = None
             st.rerun()
 
-    st.header("Login using Password", text_alignment='center')
-    st.space()
+    st.header("Login using Password")
 
     teacher_username = st.text_input("Enter username", placeholder='Username')
     teacher_pass = st.text_input("Enter password", type='password', placeholder="Password")
@@ -80,14 +79,45 @@ def teacher_screen_login():
     btnc1, btnc2 = st.columns(2)
 
     with btnc1:
-        st.button('Login', icon=':material/passkey:' , shortcut='control+enter', width='stretch')
-
+        if st.button('Login', icon=':material/passkey:' , shortcut='control+enter', width='stretch'):
+            if not teacher_username or not teacher_pass:
+                st.error("Please enter both username and password")
+            else:
+                try:
+                    teacher = teacher_login(teacher_username, teacher_pass)
+                    if teacher:
+                        st.session_state.user_role = 'teacher'
+                        st.session_state.teacher_data = teacher
+                        st.session_state.is_logged_in = True
+                        st.toast("Welcome back!", icon="✋")
+                        import time
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("Invalid username and password")
+                except Exception as e:
+                    st.error(f"Login error: {e}")
     with btnc2:
        if st.button('Register',type="primary", icon=':material/passkey:', width='stretch'):
            st.session_state.teacher_login_type = 'register'
+           st.rerun()
 
     footer_dashboard()
 
+
+def register_teacher(teacher_username, teacher_name, teacher_pass, teacher_pass_confirm):
+    if not teacher_username or not teacher_name or not teacher_pass or not teacher_pass_confirm:
+        return False, "All fields are required!"
+    if teacher_pass != teacher_pass_confirm:
+        return False, "Password doesn't match"
+    try:
+        if check_teacher_exists(teacher_username):
+            return False, "Username already taken."
+        create_teacher(teacher_username, teacher_pass, teacher_name)
+        return True, "Registered successfully! Login using password and username."
+    except Exception as e:
+        return False, f"Registration error: {e}"
+    
 def teacher_screen_register():
 
     c1,c2  = st.columns(2, vertical_alignment='center', gap='xxlarge')
@@ -98,8 +128,6 @@ def teacher_screen_register():
             st.session_state['login_type'] = None
             st.rerun()
     st.header("Register Your Teacher Profile")
-    st.space()
-    st.space()
 
     teacher_username = st.text_input("Enter username", placeholder='Username')
     teacher_name = st.text_input("Enter name", placeholder='name')
@@ -111,9 +139,19 @@ def teacher_screen_register():
     btnc1, btnc2 = st.columns(2)
 
     with btnc1:
-        st.button('Register', icon=':material/passkey:' , shortcut='control+enter', width='stretch')
+        if st.button('Register', icon=':material/passkey:' , shortcut='control+enter', width='stretch'):
+            success, message = register_teacher(teacher_username, teacher_name, teacher_pass, teacher_pass_confirm)
+            if success:
+                st.success(message)
+                import time
+                time.sleep(2)
+                st.session_state.teacher_login_type = "login"
+                st.rerun()
+            else:
+                st.error(message)
 
     with btnc2:
         if st.button('Login',type="primary", icon=':material/passkey:', width='stretch'):
             st.session_state.teacher_login_type = 'login'
+            st.rerun()
     footer_dashboard()
